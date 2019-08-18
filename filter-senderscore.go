@@ -30,6 +30,7 @@ import (
 )
 
 var blockBelow *int
+var junkBelow *int
 var slowFactor *int
 
 
@@ -38,6 +39,8 @@ type session struct {
 
 	category int8
 	score int8
+
+	first_line bool
 }
 
 var sessions = make(map[string]session)
@@ -56,6 +59,7 @@ var filters = map[string]func(string, []string) {
 	"auth": delayedAnswer,
 	"mail-from": delayedAnswer,
 	"rcpt-to": delayedAnswer,
+	"data-line": dataline,
 	"data": delayedAnswer,
 	"commit": delayedAnswer,
 	"quit": delayedAnswer,
@@ -129,6 +133,21 @@ func delayedAnswer(sessionId string, params[] string) {
 	go waitAndProceed(sessionId, token, delay)
 }
 
+func dataline(sessionId string, params[] string) {
+	token := params[0]
+	line := strings.Join(params[1:], "|")
+
+	s := sessions[sessionId]
+	if s.first_line == true {
+		if (s.score != -1 && s.score < int8(*junkBelow)) {
+			fmt.Printf("filter-dataline|%s|%s|X-Spam: Yes\n", token, sessionId, line)
+		}
+		s.first_line = false
+	}
+	sessions[sessionId] = s
+	fmt.Printf("filter-dataline|%s|%s|%s\n", token, sessionId, line)
+}
+
 
 func waitAndProceed(sessionId string, token string, delay int) {
 	time.Sleep(time.Duration(delay) * time.Millisecond)
@@ -174,6 +193,7 @@ func skipConfig(scanner *bufio.Scanner) {
 
 func main() {
 	blockBelow = flag.Int("blockBelow", -1, "score below which session is blocked")
+	junkBelow = flag.Int("junkBelow", -1, "score below which session is junked")
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
 
 	flag.Parse()
