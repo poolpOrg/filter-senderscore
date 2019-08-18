@@ -9,6 +9,7 @@ session based on the reputation of the source IP address.
 The filter currently supports:
 
 - blocking hosts with reputation below a certain value
+- adding X-Spam header to hosts with reputation below a certain value
 - apply to a session a time penalty proportional to the IP reputation
 
 
@@ -45,7 +46,9 @@ filter "senderscore" proc-exec "/usr/local/bin/filter-senderscore -blockBelow 50
 listen on all filter "senderscore"
 ```
 
-`-blockBelow` will display am error banner for sessions with reputation score below value then disconnect.
+`-blockBelow` will display an error banner for sessions with reputation score below value then disconnect.
+
+`-junkBelow` will prepend the 'X-Spam: yes' header to messages
 
 `-slowFactor` will delay all answers to a reputation-related percentage of its value in milliseconds.
 
