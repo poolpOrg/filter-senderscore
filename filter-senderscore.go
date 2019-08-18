@@ -96,7 +96,7 @@ func linkConnect(sessionId string, params []string) {
 	s.category = int8(category)
 	s.score = int8(score)
 	
-	fmt.Fprintf(os.Stderr, "senderscore(%s) -> %s\n", addr, resolved)
+	fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%s\n", addr, resolved)
 	sessions[sessionId] = s
 }
 
