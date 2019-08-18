@@ -71,6 +71,7 @@ func linkConnect(sessionId string, params []string) {
 	}
 
 	s := session{}
+	s.first_line = true
 	s.score = -1
 	sessions[sessionId] = s
 
@@ -140,7 +141,7 @@ func dataline(sessionId string, params[] string) {
 	s := sessions[sessionId]
 	if s.first_line == true {
 		if (s.score != -1 && s.score < int8(*junkBelow)) {
-			fmt.Printf("filter-dataline|%s|%s|X-Spam: Yes\n", token, sessionId, line)
+			fmt.Printf("filter-dataline|%s|%s|X-Spam: Yes\n", token, sessionId)
 		}
 		s.first_line = false
 	}
