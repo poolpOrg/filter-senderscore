@@ -41,7 +41,7 @@ The filter itself requires no configuration.
 
 It must be declared in smtpd.conf and attached to a listener:
 ```
-filter "senderscore" proc-exec "/usr/local/bin/filter-senderscore -blockBelow 50 -slowFactor 1000"
+filter "senderscore" proc-exec "/usr/local/bin/filter-senderscore -blockBelow 50 -junkBelow 80 -slowFactor 1000"
 
 listen on all filter "senderscore"
 ```
