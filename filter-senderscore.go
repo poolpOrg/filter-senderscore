@@ -32,7 +32,7 @@ import (
 var blockBelow *int
 var junkBelow *int
 var slowFactor *int
-
+var scoreHeader *bool
 
 type session struct {
 	id string
@@ -143,6 +143,9 @@ func dataline(sessionId string, params[] string) {
 		if (s.score != -1 && s.score < int8(*junkBelow)) {
 			fmt.Printf("filter-dataline|%s|%s|X-Spam: Yes\n", token, sessionId)
 		}
+		if (s.score != -1 && *scoreHeader) {
+			fmt.Printf("filter-dataline|%s|%s|X-SenderScore: %d\n", token, sessionId, s.score)
+		}
 		s.first_line = false
 	}
 	sessions[sessionId] = s
@@ -196,6 +199,7 @@ func main() {
 	blockBelow = flag.Int("blockBelow", -1, "score below which session is blocked")
 	junkBelow = flag.Int("junkBelow", -1, "score below which session is junked")
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
+	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
 
 	flag.Parse()
 	scanner := bufio.NewScanner(os.Stdin)
