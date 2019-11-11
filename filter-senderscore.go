@@ -99,7 +99,7 @@ func linkConnect(phase string, sessionId string, params []string) {
 	s.category = int8(category)
 	s.score = int8(score)
 	
-	fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%s\n", addr, resolved)
+	fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%d\n", addr, score)
 }
 
 func linkDisconnect(phase string, sessionId string, params []string) {
