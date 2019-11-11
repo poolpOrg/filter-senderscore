@@ -52,3 +52,5 @@ listen on all filter "senderscore"
 
 `-slowFactor` will delay all answers to a reputation-related percentage of its value in milliseconds.
 
+`-scoreHeader` will add an X-SenderScore header with reputation value if known.
+
