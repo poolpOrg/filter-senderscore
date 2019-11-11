@@ -44,7 +44,7 @@ type session struct {
 	first_line bool
 }
 
-var sessions = make(map[string]session)
+var sessions = make(map[string]*session)
 
 var reporters = map[string]func(string, []string) {
 	"link-connect": linkConnect,
@@ -71,7 +71,7 @@ func linkConnect(sessionId string, params []string) {
 		log.Fatal("invalid input, shouldn't happen")
 	}
 
-	s := session{}
+	s := &session{}
 	s.first_line = true
 	s.score = -1
 	sessions[sessionId] = s
@@ -98,7 +98,6 @@ func linkConnect(sessionId string, params []string) {
 	s.score = int8(score)
 	
 	fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%s\n", addr, resolved)
-	sessions[sessionId] = s
 }
 
 func linkDisconnect(sessionId string, params []string) {
@@ -109,24 +108,21 @@ func linkDisconnect(sessionId string, params []string) {
 }
 
 func filterConnect(sessionId string, params[] string) {
-	token := params[0]
 	s := sessions[sessionId]
 
-	if (s.score != -1 && s.score < int8(*blockBelow)) {
-		fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", token, sessionId)
+	// no slow factor, neutral or 100% good IP
+	if (*slowFactor == -1 || s.score == -1 || s.score == 100) {
+		s.delay = -1
 	} else {
-		// no slow factor, neutral or 100% good IP
-		if (*slowFactor == -1 || s.score == -1 || s.score == 100) {
-			s.delay = -1
-		} else {
-			s.delay = *slowFactor - ((*slowFactor / 100) * int(s.score))
-		}
+		s.delay = *slowFactor - ((*slowFactor / 100) * int(s.score))
+	}
 
-		if (s.score != -1 && s.score < int8(*junkBelow)) {
-			delayedJunk(sessionId, params)
-		} else {
-			delayedProceed(sessionId, params)
-		}
+	if (s.score != -1 && s.score < int8(*blockBelow)) {
+		delayedDisconnect(sessionId, params)
+	} else if (s.score != -1 && s.score < int8(*junkBelow)) {
+		delayedJunk(sessionId, params)
+	} else {
+		delayedProceed(sessionId, params)
 	}
 }
 
@@ -148,29 +144,34 @@ func dataline(sessionId string, params[] string) {
 func delayedJunk(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-
-	if (s.delay == -1) {
-		fmt.Printf("filter-result|%s|%s|junk\n", token, sessionId)
-		return
-	}
 	go waitThenAction(sessionId, token, s.delay, "junk")
 }
 
 func delayedProceed(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-
-	if (s.delay == -1) {
-		fmt.Printf("filter-result|%s|%s|proceed\n", token, sessionId)
-		return
-	}
-
 	go waitThenAction(sessionId, token, s.delay, "proceed")
 }
 
+func delayedDisconnect(sessionId string, params[] string) {
+	token := params[0]
+	s := sessions[sessionId]
+	go waitThenDisconnect(sessionId, token, s.delay)
+}
+
 func waitThenAction(sessionId string, token string, delay int, action string) {
-	time.Sleep(time.Duration(delay) * time.Millisecond)
+	if (delay != -1) {
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+	}
 	fmt.Printf("filter-result|%s|%s|%s\n", token, sessionId, action)
+	return
+}
+
+func waitThenDisconnect(sessionId string, token string, delay int) {
+	if (delay != -1) {
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+	}
+	fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", token, sessionId)
 	return
 }
 
