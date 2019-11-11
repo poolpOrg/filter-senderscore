@@ -48,6 +48,8 @@ listen on all filter "senderscore"
 
 `-blockBelow` will display an error banner for sessions with reputation score below value then disconnect.
 
+`-blockPhase` will determine at which phase `-blockBelow` will be triggered, defaults to `connect`, valid choices are `connect`, `helo`, `ehlo`, `starttls`, `auth`, `mail-from`, `rcpt-to` and `quit`. Note that `quit` will result in a message at the end of a session and may only be used to warn sender that reputation is degrading as it will not prevent transactions from succeeding.
+
 `-junkBelow` will prepend the 'X-Spam: yes' header to messages
 
 `-slowFactor` will delay all answers to a reputation-related percentage of its value in milliseconds.

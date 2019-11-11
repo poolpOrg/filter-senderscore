@@ -30,6 +30,7 @@ import (
 )
 
 var blockBelow *int
+var blockPhase *string
 var junkBelow *int
 var slowFactor *int
 var scoreHeader *bool
@@ -46,27 +47,28 @@ type session struct {
 
 var sessions = make(map[string]*session)
 
-var reporters = map[string]func(string, []string) {
+var reporters = map[string]func(string, string, []string) {
 	"link-connect": linkConnect,
 	"link-disconnect": linkDisconnect,
 }
 
-var filters = map[string]func(string, []string) {
+var filters = map[string]func(string, string, []string) {
 	"connect": filterConnect,
 
-	"helo": delayedProceed,
-	"ehlo": delayedProceed,
-	"starttls": delayedProceed,
-	"auth": delayedProceed,
-	"mail-from": delayedProceed,
-	"rcpt-to": delayedProceed,
-	"data": delayedProceed,
+	"helo": delayedAnswer,
+	"ehlo": delayedAnswer,
+	"starttls": delayedAnswer,
+	"auth": delayedAnswer,
+	"mail-from": delayedAnswer,
+	"rcpt-to": delayedAnswer,
+	"data": delayedAnswer,
 	"data-line": dataline,
-	"commit": delayedProceed,
-	"quit": delayedProceed,
+	"commit": delayedAnswer,
+
+	"quit": delayedAnswer,
 }
 
-func linkConnect(sessionId string, params []string) {
+func linkConnect(phase string, sessionId string, params []string) {
 	if len(params) != 4 {
 		log.Fatal("invalid input, shouldn't happen")
 	}
@@ -100,14 +102,14 @@ func linkConnect(sessionId string, params []string) {
 	fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%s\n", addr, resolved)
 }
 
-func linkDisconnect(sessionId string, params []string) {
+func linkDisconnect(phase string, sessionId string, params []string) {
 	if len(params) != 0 {
 		log.Fatal("invalid input, shouldn't happen")
 	}
 	delete(sessions, sessionId)
 }
 
-func filterConnect(sessionId string, params[] string) {
+func filterConnect(phase string, sessionId string, params[] string) {
 	s := sessions[sessionId]
 
 	// no slow factor, neutral or 100% good IP
@@ -117,7 +119,7 @@ func filterConnect(sessionId string, params[] string) {
 		s.delay = *slowFactor - ((*slowFactor / 100) * int(s.score))
 	}
 
-	if (s.score != -1 && s.score < int8(*blockBelow)) {
+	if (s.score != -1 && s.score < int8(*blockBelow) && *blockPhase == "connect") {
 		delayedDisconnect(sessionId, params)
 	} else if (s.score != -1 && s.score < int8(*junkBelow)) {
 		delayedJunk(sessionId, params)
@@ -126,7 +128,7 @@ func filterConnect(sessionId string, params[] string) {
 	}
 }
 
-func dataline(sessionId string, params[] string) {
+func dataline(phase string, sessionId string, params[] string) {
 	token := params[0]
 	line := strings.Join(params[1:], "|")
 
@@ -139,6 +141,16 @@ func dataline(sessionId string, params[] string) {
 	}
 	sessions[sessionId] = s
 	fmt.Printf("filter-dataline|%s|%s|%s\n", token, sessionId, line)
+}
+
+func delayedAnswer(phase string, sessionId string, params[] string) {
+	s := sessions[sessionId]
+	if (s.score != -1 && s.score < int8(*blockBelow) && *blockPhase == phase) {
+		delayedDisconnect(sessionId, params)
+		return
+	}
+
+	delayedProceed(sessionId, params)
 }
 
 func delayedJunk(sessionId string, params[] string) {
@@ -185,11 +197,11 @@ func filterInit() {
 	fmt.Println("register|ready")	
 }
 
-func trigger(currentSlice map[string]func(string, []string), atoms []string) {
+func trigger(currentSlice map[string]func(string, string, []string), atoms []string) {
 	found := false
 	for k, v := range currentSlice {
 		if k == atoms[4] {
-			v(atoms[5], atoms[6:])
+			v(atoms[4], atoms[5], atoms[6:])
 			found = true
 			break
 		}
@@ -213,11 +225,13 @@ func skipConfig(scanner *bufio.Scanner) {
 
 func main() {
 	blockBelow = flag.Int("blockBelow", -1, "score below which session is blocked")
+	blockPhase = flag.String("blockPhase", "connect", "phase at which blockBelow triggers")
 	junkBelow = flag.Int("junkBelow", -1, "score below which session is junked")
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
 	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
 
 	flag.Parse()
+
 	scanner := bufio.NewScanner(os.Stdin)
 	skipConfig(scanner)
 	filterInit()
