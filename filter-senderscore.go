@@ -33,13 +33,13 @@ var blockBelow *int
 var junkBelow *int
 var slowFactor *int
 
-
 type session struct {
 	id string
 
 	category int8
 	score int8
 
+	delay int
 	first_line bool
 }
 
@@ -53,16 +53,15 @@ var reporters = map[string]func(string, []string) {
 var filters = map[string]func(string, []string) {
 	"connect": filterConnect,
 
-	"helo": delayedAnswer,
-	"ehlo": delayedAnswer,
-	"starttls": delayedAnswer,
-	"auth": delayedAnswer,
-	"mail-from": delayedAnswer,
-	"rcpt-to": delayedAnswer,
-	"data-line": dataline,
-	"data": delayedAnswer,
-	"commit": delayedAnswer,
-	"quit": delayedAnswer,
+	"helo": delayedProceed,
+	"ehlo": delayedProceed,
+	"starttls": delayedProceed,
+	"auth": delayedProceed,
+	"mail-from": delayedProceed,
+	"rcpt-to": delayedProceed,
+	"data": delayedProceed,
+	"commit": delayedProceed,
+	"quit": delayedProceed,
 }
 
 func linkConnect(sessionId string, params []string) {
@@ -110,49 +109,50 @@ func linkDisconnect(sessionId string, params []string) {
 func filterConnect(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-	sessions[sessionId] = s
 
 	if (s.score != -1 && s.score < int8(*blockBelow)) {
 		fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", token, sessionId)
 	} else {
-		delayedAnswer(sessionId, params)
+		// no slow factor, neutral or 100% good IP
+		if (*slowFactor == -1 || s.score == -1 || s.score == 100) {
+			s.delay = -1
+		} else {
+			s.delay = *slowFactor - ((*slowFactor / 100) * int(s.score))
+		}
+
+		if (s.score != -1 && s.score < int8(*junkBelow)) {
+			delayedJunk(sessionId, params)
+		} else {
+			delayedProceed(sessionId, params)
+		}
 	}
 }
 
-func delayedAnswer(sessionId string, params[] string) {
+func delayedJunk(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
 
-	// no slow factor, neutral or 100% good IP
-	if (*slowFactor == -1 || s.score == -1 || s.score == 100) {
+	if (s.delay == -1) {
+		fmt.Printf("filter-result|%s|%s|junk\n", token, sessionId)
+		return
+	}
+	go waitThenAction(sessionId, token, s.delay, "junk")
+}
+
+func delayedProceed(sessionId string, params[] string) {
+	token := params[0]
+	s := sessions[sessionId]
+
+	if (s.delay == -1) {
 		fmt.Printf("filter-result|%s|%s|proceed\n", token, sessionId)
 		return
 	}
-
-	delay := *slowFactor - ((*slowFactor / 100) * int(s.score))
-
-	go waitAndProceed(sessionId, token, delay)
+	go waitThenAction(sessionId, token, s.delay, "proceed")
 }
 
-func dataline(sessionId string, params[] string) {
-	token := params[0]
-	line := strings.Join(params[1:], "|")
-
-	s := sessions[sessionId]
-	if s.first_line == true {
-		if (s.score != -1 && s.score < int8(*junkBelow)) {
-			fmt.Printf("filter-dataline|%s|%s|X-Spam: Yes\n", token, sessionId)
-		}
-		s.first_line = false
-	}
-	sessions[sessionId] = s
-	fmt.Printf("filter-dataline|%s|%s|%s\n", token, sessionId, line)
-}
-
-
-func waitAndProceed(sessionId string, token string, delay int) {
+func waitThenAction(sessionId string, token string, delay int, action string) {
 	time.Sleep(time.Duration(delay) * time.Millisecond)
-	fmt.Printf("filter-result|%s|%s|proceed\n", token, sessionId)
+	fmt.Printf("filter-result|%s|%s|%s\n", token, sessionId, action)
 	return
 }
 
