@@ -35,6 +35,8 @@ var junkBelow *int
 var slowFactor *int
 var scoreHeader *bool
 
+var version string
+
 type session struct {
 	id string
 
@@ -135,12 +137,20 @@ func dataline(phase string, sessionId string, params[] string) {
 	s := sessions[sessionId]
 	if s.first_line == true {
 		if (s.score != -1 && *scoreHeader) {
-			fmt.Printf("filter-dataline|%s|%s|X-SenderScore: %d\n", token, sessionId, s.score)
+			if version < "0.5" {
+				fmt.Printf("filter-dataline|%s|%s|X-SenderScore: %d\n", token, sessionId, s.score)
+			} else {
+				fmt.Printf("filter-dataline|%s|%s|X-SenderScore: %d\n", sessionId, token, s.score)
+			}
 		}
 		s.first_line = false
 	}
 	sessions[sessionId] = s
-	fmt.Printf("filter-dataline|%s|%s|%s\n", token, sessionId, line)
+	if version < "0.5" {
+		fmt.Printf("filter-dataline|%s|%s|%s\n", token, sessionId, line)
+	} else {
+		fmt.Printf("filter-dataline|%s|%s|%s\n", sessionId, token, line)
+	}
 }
 
 func delayedAnswer(phase string, sessionId string, params[] string) {
@@ -175,7 +185,11 @@ func waitThenAction(sessionId string, token string, delay int, action string) {
 	if (delay != -1) {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
-	fmt.Printf("filter-result|%s|%s|%s\n", token, sessionId, action)
+	if version < "0.5" {
+		fmt.Printf("filter-result|%s|%s|%s\n", token, sessionId, action)
+	} else {
+		fmt.Printf("filter-result|%s|%s|%s\n", sessionId, token, action)
+	}
 	return
 }
 
@@ -183,7 +197,11 @@ func waitThenDisconnect(sessionId string, token string, delay int) {
 	if (delay != -1) {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
-	fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", token, sessionId)
+	if version < "0.5" {
+		fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", token, sessionId)
+	} else {
+		fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", sessionId, token)
+	}
 	return
 }
 
@@ -245,6 +263,8 @@ func main() {
 		if len(atoms) < 6 {
 			os.Exit(1)
 		}
+
+		version = atoms[1]
 
 		switch atoms[0] {
 		case "report":
