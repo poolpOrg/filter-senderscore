@@ -52,7 +52,7 @@ listen on all filter "senderscore"
 
 `-junkBelow` will prepend the 'X-Spam: yes' header to messages
 
-`-slowFactor` will delay all answers to a reputation-related percentage of its value in milliseconds.
+`-slowFactor` will delay all answers to a reputation-related percentage of its value in milliseconds. The formula is `delay - (delay / 100) * score` where `delay` is the argument to the `-slowFactor` parameter and `score` is the reputation score. By default, connections are never delayed.
 
 `-scoreHeader` will add an X-SenderScore header with reputation value if known.
 
