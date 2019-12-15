@@ -237,6 +237,14 @@ func skipConfig(scanner *bufio.Scanner) {
 	}
 }
 
+func validatePhase(phase string) {
+	switch phase {
+	case "connect", "helo", "ehlo", "starttls", "auth", "mail-from", "rcpt-to", "quit":
+		return
+	}
+	log.Fatalf("invalid block phase: %s", phase)
+}
+
 func main() {
 	blockBelow = flag.Int("blockBelow", -1, "score below which session is blocked")
 	blockPhase = flag.String("blockPhase", "connect", "phase at which blockBelow triggers")
@@ -245,6 +253,8 @@ func main() {
 	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
 
 	flag.Parse()
+
+	validatePhase(*blockPhase)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	skipConfig(scanner)
