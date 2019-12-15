@@ -216,17 +216,13 @@ func filterInit() {
 }
 
 func trigger(currentSlice map[string]func(string, string, []string), atoms []string) {
-	found := false
 	for k, v := range currentSlice {
 		if k == atoms[4] {
 			v(atoms[4], atoms[5], atoms[6:])
-			found = true
-			break
+			return
 		}
 	}
-	if !found {
-		os.Exit(1)
-	}
+	os.Exit(1)
 }
 
 func skipConfig(scanner *bufio.Scanner) {
