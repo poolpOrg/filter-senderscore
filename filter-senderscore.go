@@ -216,13 +216,11 @@ func filterInit() {
 }
 
 func trigger(currentSlice map[string]func(string, string, []string), atoms []string) {
-	for k, v := range currentSlice {
-		if k == atoms[4] {
-			v(atoms[4], atoms[5], atoms[6:])
-			return
-		}
+	if handler, ok := currentSlice[atoms[4]]; ok {
+		handler(atoms[4], atoms[5], atoms[6:])
+	} else {
+		log.Fatalf("invalid phase: %s", atoms[4])
 	}
-	os.Exit(1)
 }
 
 func skipConfig(scanner *bufio.Scanner) {
