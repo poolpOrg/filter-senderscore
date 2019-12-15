@@ -130,6 +130,18 @@ func filterConnect(phase string, sessionId string, params[] string) {
 	}
 }
 
+func printMsg(msgType string, sessionId string, token string, format string, a ...interface{}) {
+	var args []interface{}
+
+	if version < "0.5" {
+		args = append([]interface{}{msgType, token, sessionId}, a...)
+	} else {
+		args = append([]interface{}{msgType, sessionId, token}, a...)
+	}
+
+	fmt.Printf("%s|%s|%s|" + format + "\n", args...)
+}
+
 func dataline(phase string, sessionId string, params[] string) {
 	token := params[0]
 	line := strings.Join(params[1:], "|")
@@ -137,20 +149,12 @@ func dataline(phase string, sessionId string, params[] string) {
 	s := sessions[sessionId]
 	if s.first_line == true {
 		if (s.score != -1 && *scoreHeader) {
-			if version < "0.5" {
-				fmt.Printf("filter-dataline|%s|%s|X-SenderScore: %d\n", token, sessionId, s.score)
-			} else {
-				fmt.Printf("filter-dataline|%s|%s|X-SenderScore: %d\n", sessionId, token, s.score)
-			}
+			printMsg("filter-dataline", sessionId, token, "X-SenderScore: %d", s.score)
 		}
 		s.first_line = false
 	}
 	sessions[sessionId] = s
-	if version < "0.5" {
-		fmt.Printf("filter-dataline|%s|%s|%s\n", token, sessionId, line)
-	} else {
-		fmt.Printf("filter-dataline|%s|%s|%s\n", sessionId, token, line)
-	}
+	printMsg("filter-dataline", sessionId, token, "%s", line)
 }
 
 func delayedAnswer(phase string, sessionId string, params[] string) {
@@ -185,24 +189,14 @@ func waitThenAction(sessionId string, token string, delay int, action string) {
 	if (delay != -1) {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
-	if version < "0.5" {
-		fmt.Printf("filter-result|%s|%s|%s\n", token, sessionId, action)
-	} else {
-		fmt.Printf("filter-result|%s|%s|%s\n", sessionId, token, action)
-	}
-	return
+	printMsg("filter-result", sessionId, token, "%s", action)
 }
 
 func waitThenDisconnect(sessionId string, token string, delay int) {
 	if (delay != -1) {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
-	if version < "0.5" {
-		fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", token, sessionId)
-	} else {
-		fmt.Printf("filter-result|%s|%s|disconnect|550 your IP reputation is too low for this MX\n", sessionId, token)
-	}
-	return
+	printMsg("filter-result", sessionId, token, "disconnect|550 your IP reputation is too low for this MX")
 }
 
 func filterInit() {
