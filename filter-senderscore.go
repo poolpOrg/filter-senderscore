@@ -263,9 +263,10 @@ func main() {
 			os.Exit(0)
 		}
 		
-		atoms := strings.Split(scanner.Text(), "|")
+		line := scanner.Text()
+		atoms := strings.Split(line, "|")
 		if len(atoms) < 6 {
-			os.Exit(1)
+			log.Fatalf("missing atoms: %s", line)
 		}
 
 		version = atoms[1]
@@ -276,7 +277,7 @@ func main() {
 		case "filter":
 			trigger(filters, atoms)
 		default:
-			os.Exit(1)
+			log.Fatalf("invalid stream: %s", atoms[0])
 		}
 	}
 }
