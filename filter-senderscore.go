@@ -112,7 +112,10 @@ func linkDisconnect(phase string, sessionId string, params []string) {
 }
 
 func filterConnect(phase string, sessionId string, params[] string) {
-	s := sessions[sessionId]
+	s, ok := sessions[sessionId]
+	if !ok {
+		log.Fatalf("invalid session ID: %s", sessionId)
+	}
 
 	// no slow factor, neutral or 100% good IP
 	if (*slowFactor == -1 || s.score == -1 || s.score == 100) {
@@ -134,7 +137,11 @@ func dataline(phase string, sessionId string, params[] string) {
 	token := params[0]
 	line := strings.Join(params[1:], "|")
 
-	s := sessions[sessionId]
+	s, ok := sessions[sessionId]
+	if !ok {
+		log.Fatalf("invalid session ID: %s", sessionId)
+	}
+
 	if s.first_line == true {
 		if (s.score != -1 && *scoreHeader) {
 			if version < "0.5" {
@@ -154,7 +161,11 @@ func dataline(phase string, sessionId string, params[] string) {
 }
 
 func delayedAnswer(phase string, sessionId string, params[] string) {
-	s := sessions[sessionId]
+	s, ok := sessions[sessionId]
+	if !ok {
+		log.Fatalf("invalid session ID: %s", sessionId)
+	}
+
 	if (s.score != -1 && s.score < int8(*blockBelow) && *blockPhase == phase) {
 		delayedDisconnect(sessionId, params)
 		return
