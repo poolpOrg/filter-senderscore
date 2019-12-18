@@ -273,6 +273,13 @@ func loadWhitelists() {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		addr := scanner.Text()
+
+		// remove comments and whitespace, skip empty lines
+		addr = strings.TrimSpace(strings.Split(addr, "#")[0])
+		if addr == "" {
+			continue
+		}
+
 		fmt.Fprintf(os.Stderr, "IP address %s added to whitelist\n", addr)
 		whitelist[addr] = true
 	}
