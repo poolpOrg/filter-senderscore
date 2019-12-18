@@ -163,7 +163,7 @@ func dataline(phase string, sessionId string, params[] string) {
 		}
 		s.first_line = false
 	}
-	sessions[sessionId] = s
+
 	produceOutput("filter-dataline", sessionId, token, "%s", line)
 }
 
