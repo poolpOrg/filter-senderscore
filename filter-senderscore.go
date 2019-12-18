@@ -199,11 +199,11 @@ func delayedDisconnect(sessionId string, params[] string) {
 	go waitThenDisconnect(sessionId, token, s.delay)
 }
 
-func waitThenAction(sessionId string, token string, delay int, action string) {
+func waitThenAction(sessionId string, token string, delay int, format string, a ...interface{}) {
 	if (delay != -1) {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
-	produceOutput("filter-result", sessionId, token, "%s", action)
+	produceOutput("filter-result", sessionId, token, format, a...)
 }
 
 func waitThenDisconnect(sessionId string, token string, delay int) {
