@@ -151,7 +151,7 @@ func produceOutput(msgType string, sessionId string, token string, format string
 	} else {
 		out = msgType + "|" + sessionId + "|" + token
 	}
-	out += fmt.Sprintf(format, a)
+	out += "|" + fmt.Sprintf(format, a...)
 
 	outputChannel <- out
 }
