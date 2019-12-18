@@ -196,7 +196,7 @@ func delayedProceed(sessionId string, params[] string) {
 func delayedDisconnect(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-	go waitThenDisconnect(sessionId, token, s.delay)
+	go waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
 }
 
 func waitThenAction(sessionId string, token string, delay int, format string, a ...interface{}) {
@@ -204,13 +204,6 @@ func waitThenAction(sessionId string, token string, delay int, format string, a 
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
 	produceOutput("filter-result", sessionId, token, format, a...)
-}
-
-func waitThenDisconnect(sessionId string, token string, delay int) {
-	if (delay != -1) {
-		time.Sleep(time.Duration(delay) * time.Millisecond)
-	}
-	produceOutput("filter-result", sessionId, token, "disconnect|550 your IP reputation is too low for this MX")
 }
 
 func filterInit() {
