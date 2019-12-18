@@ -34,6 +34,8 @@ var blockPhase *string
 var junkBelow *int
 var slowFactor *int
 var scoreHeader *bool
+var whitelistFile *string
+var whitelist = make(map[string]bool)
 
 var version string
 
@@ -84,6 +86,12 @@ func linkConnect(phase string, sessionId string, params []string) {
 
 	addr := net.ParseIP(strings.Split(params[2], ":")[0])
 	if addr == nil || strings.Contains(addr.String(), ":") {
+		return
+	}
+
+	if whitelist[addr.String()] {
+		fmt.Fprintf(os.Stderr, "IP address %s found on whitelist\n", addr)
+		s.score = 100
 		return
 	}
 
@@ -251,16 +259,40 @@ func validatePhase(phase string) {
 	log.Fatalf("invalid block phase: %s", phase)
 }
 
+func loadWhitelists() {
+	if *whitelistFile == "" {
+		return
+	}
+
+	file, err := os.Open(*whitelistFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		addr := scanner.Text()
+		fmt.Fprintf(os.Stderr, "IP address %s added to whitelist\n", addr)
+		whitelist[addr] = true
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	blockBelow = flag.Int("blockBelow", -1, "score below which session is blocked")
 	blockPhase = flag.String("blockPhase", "connect", "phase at which blockBelow triggers")
 	junkBelow = flag.Int("junkBelow", -1, "score below which session is junked")
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
 	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
+	whitelistFile = flag.String("whitelist", "", "file containing a list of IP addresses to whitelist, one per line")
 
 	flag.Parse()
 
 	validatePhase(*blockPhase)
+	loadWhitelists()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	skipConfig(scanner)
