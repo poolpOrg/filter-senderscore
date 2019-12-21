@@ -36,6 +36,7 @@ var slowFactor *int
 var scoreHeader *bool
 var whitelistFile *string
 var whitelist = make(map[string]bool)
+var subnetWhitelist = make([]*net.IPNet, 0)
 
 var version string
 
@@ -93,6 +94,14 @@ func linkConnect(phase string, sessionId string, params []string) {
 		fmt.Fprintf(os.Stderr, "IP address %s found on whitelist\n", addr)
 		s.score = 100
 		return
+	}
+
+	for _, subnet := range subnetWhitelist {
+		if subnet.Contains(addr) {
+			fmt.Fprintf(os.Stderr, "IP address %s matches whitelisted subnet %s\n", addr, subnet)
+			s.score = 100
+			return
+		}
 	}
 
 	atoms := strings.Split(addr.String(), ".")
@@ -266,8 +275,24 @@ func loadWhitelists() {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		addr := scanner.Text()
-		fmt.Fprintf(os.Stderr, "IP address %s added to whitelist\n", addr)
-		whitelist[addr] = true
+
+		// remove comments and whitespace, skip empty lines
+		addr = strings.TrimSpace(strings.Split(addr, "#")[0])
+		if addr == "" {
+			continue
+		}
+
+		if strings.Contains(addr, "/") {
+			_, subnet, err := net.ParseCIDR(addr)
+			if err != nil {
+				log.Fatalf("invalid subnet: %s", addr)
+			}
+			fmt.Fprintf(os.Stderr, "Subnet %s added to whitelist\n", addr)
+			subnetWhitelist = append(subnetWhitelist, subnet)
+		} else {
+			fmt.Fprintf(os.Stderr, "IP address %s added to whitelist\n", addr)
+			whitelist[addr] = true
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
@@ -280,7 +305,7 @@ func main() {
 	junkBelow = flag.Int("junkBelow", -1, "score below which session is junked")
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
 	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
-	whitelistFile = flag.String("whitelist", "", "file containing a list of IP addresses to whitelist, one per line")
+	whitelistFile = flag.String("whitelist", "", "file containing a list of IP addresses or subnets in CIDR notation to whitelist, one per line")
 
 	flag.Parse()
 
