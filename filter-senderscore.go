@@ -171,7 +171,7 @@ func dataline(phase string, sessionId string, params[] string) {
 		}
 		s.first_line = false
 	}
-	sessions[sessionId] = s
+
 	produceOutput("filter-dataline", sessionId, token, "%s", line)
 }
 
@@ -204,21 +204,14 @@ func delayedProceed(sessionId string, params[] string) {
 func delayedDisconnect(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-	go waitThenDisconnect(sessionId, token, s.delay)
+	go waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
 }
 
-func waitThenAction(sessionId string, token string, delay int, action string) {
+func waitThenAction(sessionId string, token string, delay int, format string, a ...interface{}) {
 	if (delay != -1) {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
-	produceOutput("filter-result", sessionId, token, "%s", action)
-}
-
-func waitThenDisconnect(sessionId string, token string, delay int) {
-	if (delay != -1) {
-		time.Sleep(time.Duration(delay) * time.Millisecond)
-	}
-	produceOutput("filter-result", sessionId, token, "disconnect|550 your IP reputation is too low for this MX")
+	produceOutput("filter-result", sessionId, token, format, a...)
 }
 
 func filterInit() {
