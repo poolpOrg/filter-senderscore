@@ -35,6 +35,7 @@ var junkBelow *int
 var slowFactor *int
 var scoreHeader *bool
 var whitelistFile *string
+var disableConcurrency *bool
 var whitelist = make(map[string]bool)
 var subnetWhitelist = make([]*net.IPNet, 0)
 
@@ -162,7 +163,11 @@ func produceOutput(msgType string, sessionId string, token string, format string
 	}
 	out += "|" + fmt.Sprintf(format, a...)
 
-	outputChannel <- out
+	if *disableConcurrency {
+		fmt.Println(out)
+	} else {
+		outputChannel <- out
+	}
 }
 
 func dataline(phase string, sessionId string, params[] string) {
@@ -201,19 +206,31 @@ func delayedAnswer(phase string, sessionId string, params[] string) {
 func delayedJunk(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-	go waitThenAction(sessionId, token, s.delay, "junk")
+	if *disableConcurrency {
+		waitThenAction(sessionId, token, s.delay, "junk")
+	} else {
+		go waitThenAction(sessionId, token, s.delay, "junk")
+	}
 }
 
 func delayedProceed(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-	go waitThenAction(sessionId, token, s.delay, "proceed")
+	if *disableConcurrency {
+		waitThenAction(sessionId, token, s.delay, "proceed")
+	} else {
+		go waitThenAction(sessionId, token, s.delay, "proceed")
+	}
 }
 
 func delayedDisconnect(sessionId string, params[] string) {
 	token := params[0]
 	s := sessions[sessionId]
-	go waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
+	if *disableConcurrency {
+		waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
+	} else {
+		go waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
+	}
 }
 
 func waitThenAction(sessionId string, token string, delay int, format string, a ...interface{}) {
@@ -306,6 +323,7 @@ func main() {
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
 	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
 	whitelistFile = flag.String("whitelist", "", "file containing a list of IP addresses or subnets in CIDR notation to whitelist, one per line")
+	disableConcurrency = flag.Bool("disableConcurrency", false, "process all requests sequentially, only for debugging purposes")
 
 	flag.Parse()
 
@@ -316,12 +334,14 @@ func main() {
 	skipConfig(scanner)
 	filterInit()
 
-	outputChannel = make(chan string)
-	go func() {
-		for line := range outputChannel {
-			fmt.Println(line)
-		}
-	}()
+	if !*disableConcurrency {
+		outputChannel = make(chan string)
+		go func() {
+			for line := range outputChannel {
+				fmt.Println(line)
+			}
+		}()
+	}
 
 	for {
 		if !scanner.Scan() {
