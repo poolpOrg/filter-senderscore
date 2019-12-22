@@ -9,12 +9,14 @@ session based on the reputation of the source IP address.
 The filter currently supports:
 
 - blocking hosts with reputation below a certain value
-- adding X-Spam header to hosts with reputation below a certain value
-- apply to a session a time penalty proportional to the IP reputation
+- adding an `X-SenderScore` header with the score of the source IP address
+- adding an `X-Spam` header to hosts with reputation below a certain value
+- applying a time penalty proportional to the IP reputation
+- whitelisting IP addresses or subnets
 
 
 ## Dependencies
-The filter is written in Golang and doesn't have any dependencies beyond standard library.
+The filter is written in Golang and doesn't have any dependencies beyond the standard library.
 
 It requires OpenSMTPD 6.6.0 or higher.
 
@@ -26,7 +28,6 @@ On OpenBSD:
 $ doas pkg_add filter-senderscore
 quirks-3.167 signed on 2019-08-11T14:18:58Z
 filter-senderscore-v0.1.0: ok
-$
 ```
 
 Alternatively, clone the repository, build and install the filter:
@@ -35,6 +36,8 @@ $ cd filter-senderscore/
 $ go build
 $ doas install -m 0555 filter-senderscore /usr/local/bin/filter-senderscore
 ```
+
+On Linux, use sudo(8) instead of doas(1).
 
 ## How to configure
 The filter itself requires no configuration.
@@ -50,7 +53,7 @@ listen on all filter "senderscore"
 
 `-blockPhase` will determine at which phase `-blockBelow` will be triggered, defaults to `connect`, valid choices are `connect`, `helo`, `ehlo`, `starttls`, `auth`, `mail-from`, `rcpt-to` and `quit`. Note that `quit` will result in a message at the end of a session and may only be used to warn sender that reputation is degrading as it will not prevent transactions from succeeding.
 
-`-junkBelow` will prepend the 'X-Spam: yes' header to messages
+`-junkBelow` will prepend the 'X-Spam: yes' header to messages.
 
 `-slowFactor` will delay all answers to a reputation-related percentage of its value in milliseconds. The formula is `delay - (delay / 100) * score` where `delay` is the argument to the `-slowFactor` parameter and `score` is the reputation score. By default, connections are never delayed.
 
