@@ -141,11 +141,11 @@ func getSession(sessionId string) *session {
 func filterConnect(phase string, sessionId string, params []string) {
 	s := getSession(sessionId)
 
-	// no slow factor, neutral or 100% good IP
-	if *slowFactor == -1 || s.score == -1 || s.score == 100 {
-		s.delay = -1
+	if *slowFactor > 0 && s.score > 0 {
+		s.delay = *slowFactor * (100 - int(s.score)) / 100
 	} else {
-		s.delay = *slowFactor - ((*slowFactor / 100) * int(s.score))
+		// no slow factor or neutral IP address
+		s.delay = 0
 	}
 
 	if s.score != -1 && s.score < int8(*blockBelow) && *blockPhase == "connect" {
@@ -231,7 +231,7 @@ func delayedDisconnect(sessionId string, params []string) {
 }
 
 func waitThenAction(sessionId string, token string, delay int, format string, a ...interface{}) {
-	if delay != -1 {
+	if delay > 0 {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
 	produceOutput("filter-result", sessionId, token, format, a...)
