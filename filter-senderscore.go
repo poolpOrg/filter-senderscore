@@ -91,6 +91,10 @@ func linkConnect(phase string, sessionId string, params []string) {
 		return
 	}
 
+	defer func(addr net.IP, s *session) {
+		fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%d\n", addr, s.score)
+	}(addr, s)
+
 	for maskOnes := range whitelistMasks {
 		mask := net.CIDRMask(maskOnes, 32)
 		maskedAddr := addr.Mask(mask).String()
@@ -117,8 +121,6 @@ func linkConnect(phase string, sessionId string, params []string) {
 
 	s.category = int8(category)
 	s.score = int8(score)
-
-	fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%d\n", addr, score)
 }
 
 func linkDisconnect(phase string, sessionId string, params []string) {
