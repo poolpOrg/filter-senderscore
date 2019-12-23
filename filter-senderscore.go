@@ -130,11 +130,16 @@ func linkDisconnect(phase string, sessionId string, params []string) {
 	delete(sessions, sessionId)
 }
 
-func filterConnect(phase string, sessionId string, params []string) {
+func getSession(sessionId string) *session {
 	s, ok := sessions[sessionId]
 	if !ok {
 		log.Fatalf("invalid session ID: %s", sessionId)
 	}
+	return s
+}
+
+func filterConnect(phase string, sessionId string, params []string) {
+	s := getSession(sessionId)
 
 	// no slow factor, neutral or 100% good IP
 	if *slowFactor == -1 || s.score == -1 || s.score == 100 {
@@ -170,13 +175,9 @@ func produceOutput(msgType string, sessionId string, token string, format string
 }
 
 func dataline(phase string, sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
 	line := strings.Join(params[1:], "|")
-
-	s, ok := sessions[sessionId]
-	if !ok {
-		log.Fatalf("invalid session ID: %s", sessionId)
-	}
 
 	if s.first_line == true {
 		if s.score != -1 && *scoreHeader {
@@ -189,10 +190,7 @@ func dataline(phase string, sessionId string, params []string) {
 }
 
 func delayedAnswer(phase string, sessionId string, params []string) {
-	s, ok := sessions[sessionId]
-	if !ok {
-		log.Fatalf("invalid session ID: %s", sessionId)
-	}
+	s := getSession(sessionId)
 
 	if s.score != -1 && s.score < int8(*blockBelow) && *blockPhase == phase {
 		delayedDisconnect(sessionId, params)
@@ -203,8 +201,8 @@ func delayedAnswer(phase string, sessionId string, params []string) {
 }
 
 func delayedJunk(sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
-	s := sessions[sessionId]
 	if *disableConcurrency {
 		waitThenAction(sessionId, token, s.delay, "junk")
 	} else {
@@ -213,8 +211,8 @@ func delayedJunk(sessionId string, params []string) {
 }
 
 func delayedProceed(sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
-	s := sessions[sessionId]
 	if *disableConcurrency {
 		waitThenAction(sessionId, token, s.delay, "proceed")
 	} else {
@@ -223,8 +221,8 @@ func delayedProceed(sessionId string, params []string) {
 }
 
 func delayedDisconnect(sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
-	s := sessions[sessionId]
 	if *disableConcurrency {
 		waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
 	} else {
