@@ -37,7 +37,7 @@ var scoreHeader *bool
 var whitelistFile *string
 var disableConcurrency *bool
 var whitelist = make(map[string]bool)
-var subnetWhitelist = make([]*net.IPNet, 0)
+var whitelistMasks = make(map[int]bool)
 
 var version string
 
@@ -91,15 +91,12 @@ func linkConnect(phase string, sessionId string, params []string) {
 		return
 	}
 
-	if whitelist[addr.String()] {
-		fmt.Fprintf(os.Stderr, "IP address %s found on whitelist\n", addr)
-		s.score = 100
-		return
-	}
-
-	for _, subnet := range subnetWhitelist {
-		if subnet.Contains(addr) {
-			fmt.Fprintf(os.Stderr, "IP address %s matches whitelisted subnet %s\n", addr, subnet)
+	for maskOnes := range whitelistMasks {
+		mask := net.CIDRMask(maskOnes, 32)
+		maskedAddr := addr.Mask(mask).String()
+		query := fmt.Sprintf("%s/%d", maskedAddr, maskOnes)
+		if whitelist[query] {
+			fmt.Fprintf(os.Stderr, "IP address %s matches whitelisted subnet %s\n", addr, query)
 			s.score = 100
 			return
 		}
@@ -291,24 +288,30 @@ func loadWhitelists() {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		addr := scanner.Text()
+		line := scanner.Text()
 
 		// remove comments and whitespace, skip empty lines
-		addr = strings.TrimSpace(strings.Split(addr, "#")[0])
-		if addr == "" {
+		line = strings.TrimSpace(strings.Split(line, "#")[0])
+		if line == "" {
 			continue
 		}
 
-		if strings.Contains(addr, "/") {
-			_, subnet, err := net.ParseCIDR(addr)
-			if err != nil {
-				log.Fatalf("invalid subnet: %s", addr)
-			}
-			fmt.Fprintf(os.Stderr, "Subnet %s added to whitelist\n", addr)
-			subnetWhitelist = append(subnetWhitelist, subnet)
-		} else {
-			fmt.Fprintf(os.Stderr, "IP address %s added to whitelist\n", addr)
-			whitelist[addr] = true
+		if !strings.Contains(line, "/") {
+			line += "/32"
+		}
+		_, subnet, err := net.ParseCIDR(line)
+		if err != nil {
+			log.Fatalf("invalid subnet: %s", subnet)
+		}
+
+		maskOnes, _ := subnet.Mask.Size()
+		if !whitelistMasks[maskOnes] {
+			whitelistMasks[maskOnes] = true
+		}
+		subnetStr := subnet.String()
+		if !whitelist[subnetStr] {
+			whitelist[subnetStr] = true
+			fmt.Fprintf(os.Stderr, "Subnet %s added to whitelist\n", subnetStr)
 		}
 	}
 	if err := scanner.Err(); err != nil {
