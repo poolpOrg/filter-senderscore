@@ -37,7 +37,7 @@ var scoreHeader *bool
 var whitelistFile *string
 var disableConcurrency *bool
 var whitelist = make(map[string]bool)
-var subnetWhitelist = make([]*net.IPNet, 0)
+var whitelistMasks = make(map[int]bool)
 
 var version string
 
@@ -91,15 +91,16 @@ func linkConnect(phase string, sessionId string, params []string) {
 		return
 	}
 
-	if whitelist[addr.String()] {
-		fmt.Fprintf(os.Stderr, "IP address %s found on whitelist\n", addr)
-		s.score = 100
-		return
-	}
+	defer func(addr net.IP, s *session) {
+		fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%d\n", addr, s.score)
+	}(addr, s)
 
-	for _, subnet := range subnetWhitelist {
-		if subnet.Contains(addr) {
-			fmt.Fprintf(os.Stderr, "IP address %s matches whitelisted subnet %s\n", addr, subnet)
+	for maskOnes := range whitelistMasks {
+		mask := net.CIDRMask(maskOnes, 32)
+		maskedAddr := addr.Mask(mask).String()
+		query := fmt.Sprintf("%s/%d", maskedAddr, maskOnes)
+		if whitelist[query] {
+			fmt.Fprintf(os.Stderr, "IP address %s matches whitelisted subnet %s\n", addr, query)
 			s.score = 100
 			return
 		}
@@ -120,8 +121,6 @@ func linkConnect(phase string, sessionId string, params []string) {
 
 	s.category = int8(category)
 	s.score = int8(score)
-
-	fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%d\n", addr, score)
 }
 
 func linkDisconnect(phase string, sessionId string, params []string) {
@@ -131,17 +130,22 @@ func linkDisconnect(phase string, sessionId string, params []string) {
 	delete(sessions, sessionId)
 }
 
-func filterConnect(phase string, sessionId string, params []string) {
+func getSession(sessionId string) *session {
 	s, ok := sessions[sessionId]
 	if !ok {
 		log.Fatalf("invalid session ID: %s", sessionId)
 	}
+	return s
+}
 
-	// no slow factor, neutral or 100% good IP
-	if *slowFactor == -1 || s.score == -1 || s.score == 100 {
-		s.delay = -1
+func filterConnect(phase string, sessionId string, params []string) {
+	s := getSession(sessionId)
+
+	if *slowFactor > 0 && s.score > 0 {
+		s.delay = *slowFactor * (100 - int(s.score)) / 100
 	} else {
-		s.delay = *slowFactor - ((*slowFactor / 100) * int(s.score))
+		// no slow factor or neutral IP address
+		s.delay = 0
 	}
 
 	if s.score != -1 && s.score < int8(*blockBelow) && *blockPhase == "connect" {
@@ -171,13 +175,9 @@ func produceOutput(msgType string, sessionId string, token string, format string
 }
 
 func dataline(phase string, sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
 	line := strings.Join(params[1:], "|")
-
-	s, ok := sessions[sessionId]
-	if !ok {
-		log.Fatalf("invalid session ID: %s", sessionId)
-	}
 
 	if s.first_line == true {
 		if s.score != -1 && *scoreHeader {
@@ -190,10 +190,7 @@ func dataline(phase string, sessionId string, params []string) {
 }
 
 func delayedAnswer(phase string, sessionId string, params []string) {
-	s, ok := sessions[sessionId]
-	if !ok {
-		log.Fatalf("invalid session ID: %s", sessionId)
-	}
+	s := getSession(sessionId)
 
 	if s.score != -1 && s.score < int8(*blockBelow) && *blockPhase == phase {
 		delayedDisconnect(sessionId, params)
@@ -204,8 +201,8 @@ func delayedAnswer(phase string, sessionId string, params []string) {
 }
 
 func delayedJunk(sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
-	s := sessions[sessionId]
 	if *disableConcurrency {
 		waitThenAction(sessionId, token, s.delay, "junk")
 	} else {
@@ -214,8 +211,8 @@ func delayedJunk(sessionId string, params []string) {
 }
 
 func delayedProceed(sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
-	s := sessions[sessionId]
 	if *disableConcurrency {
 		waitThenAction(sessionId, token, s.delay, "proceed")
 	} else {
@@ -224,8 +221,8 @@ func delayedProceed(sessionId string, params []string) {
 }
 
 func delayedDisconnect(sessionId string, params []string) {
+	s := getSession(sessionId)
 	token := params[0]
-	s := sessions[sessionId]
 	if *disableConcurrency {
 		waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
 	} else {
@@ -234,7 +231,7 @@ func delayedDisconnect(sessionId string, params []string) {
 }
 
 func waitThenAction(sessionId string, token string, delay int, format string, a ...interface{}) {
-	if delay != -1 {
+	if delay > 0 {
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
 	produceOutput("filter-result", sessionId, token, format, a...)
@@ -291,24 +288,30 @@ func loadWhitelists() {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		addr := scanner.Text()
+		line := scanner.Text()
 
 		// remove comments and whitespace, skip empty lines
-		addr = strings.TrimSpace(strings.Split(addr, "#")[0])
-		if addr == "" {
+		line = strings.TrimSpace(strings.Split(line, "#")[0])
+		if line == "" {
 			continue
 		}
 
-		if strings.Contains(addr, "/") {
-			_, subnet, err := net.ParseCIDR(addr)
-			if err != nil {
-				log.Fatalf("invalid subnet: %s", addr)
-			}
-			fmt.Fprintf(os.Stderr, "Subnet %s added to whitelist\n", addr)
-			subnetWhitelist = append(subnetWhitelist, subnet)
-		} else {
-			fmt.Fprintf(os.Stderr, "IP address %s added to whitelist\n", addr)
-			whitelist[addr] = true
+		if !strings.Contains(line, "/") {
+			line += "/32"
+		}
+		_, subnet, err := net.ParseCIDR(line)
+		if err != nil {
+			log.Fatalf("invalid subnet: %s", subnet)
+		}
+
+		maskOnes, _ := subnet.Mask.Size()
+		if !whitelistMasks[maskOnes] {
+			whitelistMasks[maskOnes] = true
+		}
+		subnetStr := subnet.String()
+		if !whitelist[subnetStr] {
+			whitelist[subnetStr] = true
+			fmt.Fprintf(os.Stderr, "Subnet %s added to whitelist\n", subnetStr)
 		}
 	}
 	if err := scanner.Err(); err != nil {
