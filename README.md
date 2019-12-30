@@ -59,4 +59,4 @@ listen on all filter "senderscore"
 
 `-scoreHeader` will add an X-SenderScore header with reputation value if known.
 
-`-whitelist <file>` can be used to specify a file containing a list of IP addresses and subnets in CIDR notation to whitelist, one per line. IP addresses matching any entry in that list automatically receive a score of 100. The current subnet whitelist implementation performs a linear scan of all whitelisted subnets on every connection; keep this in mind when adding a lot of CIDR entries.
+`-whitelist <file>` can be used to specify a file containing a list of IP addresses and subnets in CIDR notation to whitelist, one per line. IP addresses matching any entry in that list automatically receive a score of 100.
