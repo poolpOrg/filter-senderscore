@@ -172,7 +172,10 @@ func filterConnect(phase string, sessionId string, params []string) {
 func produceOutput(msgType string, sessionId string, token string, format string, a ...interface{}) {
 	var out string
 
-	if version < "0.5" {
+	tokens := strings.Split(version, ".")
+	hiver, _ := strconv.Atoi(tokens[0])
+	lover, _ := strconv.Atoi(tokens[1])
+	if hiver == 0 && lover < 5 {
 		out = msgType + "|" + token + "|" + sessionId
 	} else {
 		out = msgType + "|" + sessionId + "|" + token
