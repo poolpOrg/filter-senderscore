@@ -35,7 +35,7 @@ var junkBelow *int
 var slowFactor *int
 var scoreHeader *bool
 var whitelistFile *string
-var disableConcurrency *bool
+var testMode *bool
 var whitelist = make(map[string]bool)
 var whitelistMasks = make(map[int]bool)
 
@@ -107,15 +107,27 @@ func linkConnect(phase string, sessionId string, params []string) {
 	}
 
 	atoms := strings.Split(addr.String(), ".")
-	addrs, _ := net.LookupIP(fmt.Sprintf("%s.%s.%s.%s.score.senderscore.com",
-		atoms[3], atoms[2], atoms[1], atoms[0]))
 
-	if len(addrs) != 1 {
-		return
+	if *testMode {
+		// if test mode is enabled, the Sender Score DNS query is
+		// skipped and the score is derived directly from the
+		// connecting IP address; IP addresses ending with 255 can be
+		// used to simulate missing Sender Score DNS entries
+		if atoms[3] == "255" {
+			return
+		}
+	} else {
+		addrs, _ := net.LookupIP(fmt.Sprintf("%s.%s.%s.%s.score.senderscore.com",
+			atoms[3], atoms[2], atoms[1], atoms[0]))
+
+		if len(addrs) != 1 {
+			return
+		}
+
+		resolved := addrs[0].String()
+		atoms = strings.Split(resolved, ".")
 	}
 
-	resolved := addrs[0].String()
-	atoms = strings.Split(resolved, ".")
 	category, _ := strconv.ParseInt(atoms[2], 10, 8)
 	score, _ := strconv.ParseInt(atoms[3], 10, 8)
 
@@ -167,7 +179,7 @@ func produceOutput(msgType string, sessionId string, token string, format string
 	}
 	out += "|" + fmt.Sprintf(format, a...)
 
-	if *disableConcurrency {
+	if *testMode {
 		fmt.Println(out)
 	} else {
 		outputChannel <- out
@@ -203,7 +215,7 @@ func delayedAnswer(phase string, sessionId string, params []string) {
 func delayedJunk(sessionId string, params []string) {
 	s := getSession(sessionId)
 	token := params[0]
-	if *disableConcurrency {
+	if *testMode {
 		waitThenAction(sessionId, token, s.delay, "junk")
 	} else {
 		go waitThenAction(sessionId, token, s.delay, "junk")
@@ -213,7 +225,7 @@ func delayedJunk(sessionId string, params []string) {
 func delayedProceed(sessionId string, params []string) {
 	s := getSession(sessionId)
 	token := params[0]
-	if *disableConcurrency {
+	if *testMode {
 		waitThenAction(sessionId, token, s.delay, "proceed")
 	} else {
 		go waitThenAction(sessionId, token, s.delay, "proceed")
@@ -223,7 +235,7 @@ func delayedProceed(sessionId string, params []string) {
 func delayedDisconnect(sessionId string, params []string) {
 	s := getSession(sessionId)
 	token := params[0]
-	if *disableConcurrency {
+	if *testMode {
 		waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
 	} else {
 		go waitThenAction(sessionId, token, s.delay, "disconnect|550 your IP reputation is too low for this MX")
@@ -326,7 +338,7 @@ func main() {
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
 	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
 	whitelistFile = flag.String("whitelist", "", "file containing a list of IP addresses or subnets in CIDR notation to whitelist, one per line")
-	disableConcurrency = flag.Bool("disableConcurrency", false, "process all requests sequentially, only for debugging purposes")
+	testMode = flag.Bool("testMode", false, "skip all DNS queries, process all requests sequentially, only for debugging purposes")
 
 	flag.Parse()
 
@@ -337,7 +349,7 @@ func main() {
 	skipConfig(scanner)
 	filterInit()
 
-	if !*disableConcurrency {
+	if !*testMode {
 		outputChannel = make(chan string)
 		go func() {
 			for line := range outputChannel {

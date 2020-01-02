@@ -1,5 +1,5 @@
 [ -z "$FILTER_BIN" ] && FILTER_BIN="$(pwd)/../filter-senderscore"
-[ -z "$FILTER_OPTS" ] && FILTER_OPTS='-disableConcurrency'
+[ -z "$FILTER_OPTS" ] && FILTER_OPTS='-testMode'
 
 test_init() {
 	TEST_DIR="$(mktemp -d)"
