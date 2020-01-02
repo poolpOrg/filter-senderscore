@@ -25,6 +25,27 @@ test_run 'initialization' '
 	test_cmp actual expected
 '
 
+test_run 'test behavior with invalid stream' '
+	cat <<-EOD | "$FILTER_BIN" $FILTER_OPTS -blockBelow 20 >&2; [ "$?" -eq 1 ]
+	config|ready
+	invalid|0.5|0|smtp-in|link-connect|7641df9771b4ed00||pass|1.2.3.4:33174|1.1.1.1:25
+	EOD
+'
+
+test_run 'test behavior with invalid phase' '
+	cat <<-EOD | "$FILTER_BIN" $FILTER_OPTS -blockBelow 20 >&2; [ "$?" -eq 1 ]
+	config|ready
+	report|0.5|0|smtp-in|invalid|7641df9771b4ed00||pass|1.2.3.4:33174|1.1.1.1:25
+	EOD
+'
+
+test_run 'test behavior with too few atoms' '
+	cat <<-EOD | "$FILTER_BIN" $FILTER_OPTS -blockBelow 20 >&2; [ "$?" -eq 1 ]
+	config|ready
+	report|0.5|0|smtp-in|link-connect
+	EOD
+'
+
 test_run 'test behavior with invalid session ID' '
 	cat <<-EOD | "$FILTER_BIN" $FILTER_OPTS -blockBelow 20 >&2; [ "$?" -eq 1 ]
 	config|ready
