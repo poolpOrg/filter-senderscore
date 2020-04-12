@@ -1,0 +1,102 @@
+.\" Copyright (C) 2020 Ryan Kavanagh <rak@debian.org>
+.\" All rights reserved.
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.Dd April 12, 2020
+.Dt FILTER-SENDERSCORE 8
+.Os
+.Sh NAME
+.Nm filter-senderscore
+.Nd SenderScore filter for OpenSMTPD
+.Sh SYNOPSIS
+.Nm filter-senderscore
+.Op Fl blockBelow Ar score
+.Op Fl blockPhase Ar phase
+.Op Fl junkBelow  Ar score
+.Op Fl slowFactor Ar factor
+.Op Fl scoreHeader
+.Sh DESCRIPTION
+The
+.Nm
+filter for the OpenSMTPD
+.Pq Xr smtpd 8
+server filters sessions based on their SenderScores reputation score.
+Its options are:
+.Bl -tag -width scoreHeader
+.It Fl blockBelow Ar score
+Displays an error banner for sessions with a reputation score below
+.Ar score
+and then disconnects.
+.It Fl blockPhase Ar phase
+Determines at which phase
+.Fl blockBelow
+is triggered.
+The default is
+.Ar connect .
+Valid choices are
+.Ar connect ,
+.Ar helo ,
+.Ar ehlo ,
+.Ar starttls ,
+.Ar auth ,
+.Ar mail-from ,
+.Ar rcpt-to ,
+and
+.Ar quit .
+Note that
+.Ar quit
+will result in a message at the end of a session and may only be used to warn
+the sender that its reputation is degrading, as it will not prevent transactions
+from succeeding.
+.It Fl junkBelow Ar score
+Prepends a
+.Ql X-Spam: yes
+header to messages for sessions with a reputation score below
+.Ar score .
+.It Fl slowFactor Ar factor
+Delays all answers by this many milliseconds, where
+.Ql score
+is the reputation score:
+.Dl factor \(mi ((factor \(di 100) \(** score)
+.It Fl scoreHeader
+Adds an
+.Ql X-SenderScore
+header with the sender's reputation score if known.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+Adding the following to
+.Pa smtpd.conf
+enables
+.Nm
+for all incoming connections.
+.Bd -literal
+filter "senderscore" proc-exec \\
+       "/usr/local/bin/filter-senderscore -blockBelow 50 \\
+                                          -junkBelow  80 \\
+                                          -slowFactor 1000"
+
+listen on all filter "senderscore"
+.Ed
+.Sh SEE ALSO
+.Xr smtpd.conf 5
+.Sh AUTHORS
+.Nm
+is Copyright \(co 2019
+.An -nosplit
+.An Gilles Chehade Aq Mt gilles@poolp.org .
+This man page is Copyright \(co 2020
+.An Ryan Kavanagh Aq Mt rak@debian.org .
+Both are distributed under the ISC license.
+.Sh BUGS
+None known.
