@@ -153,7 +153,7 @@ func getSession(sessionId string) *session {
 func filterConnect(phase string, sessionId string, params []string) {
 	s := getSession(sessionId)
 
-	if *slowFactor > 0 && s.score > 0 {
+	if *slowFactor > 0 && s.score >= 0 {
 		s.delay = *slowFactor * (100 - int(s.score)) / 100
 	} else {
 		// no slow factor or neutral IP address
