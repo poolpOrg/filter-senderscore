@@ -34,10 +34,10 @@ var blockPhase *string
 var junkBelow *int
 var slowFactor *int
 var scoreHeader *bool
-var whitelistFile *string
+var allowlistFile *string
 var testMode *bool
-var whitelist = make(map[string]bool)
-var whitelistMasks = make(map[int]bool)
+var allowlist = make(map[string]bool)
+var allowlistMasks = make(map[int]bool)
 
 var version string
 
@@ -95,12 +95,12 @@ func linkConnect(phase string, sessionId string, params []string) {
 		fmt.Fprintf(os.Stderr, "link-connect addr=%s score=%d\n", addr, s.score)
 	}(addr, s)
 
-	for maskOnes := range whitelistMasks {
+	for maskOnes := range allowlistMasks {
 		mask := net.CIDRMask(maskOnes, 32)
 		maskedAddr := addr.Mask(mask).String()
 		query := fmt.Sprintf("%s/%d", maskedAddr, maskOnes)
-		if whitelist[query] {
-			fmt.Fprintf(os.Stderr, "IP address %s matches whitelisted subnet %s\n", addr, query)
+		if allowlist[query] {
+			fmt.Fprintf(os.Stderr, "IP address %s matches allowlisted subnet %s\n", addr, query)
 			s.score = 100
 			return
 		}
@@ -290,12 +290,12 @@ func validatePhase(phase string) {
 	log.Fatalf("invalid block phase: %s", phase)
 }
 
-func loadWhitelists() {
-	if *whitelistFile == "" {
+func loadAllowlists() {
+	if *allowlistFile == "" {
 		return
 	}
 
-	file, err := os.Open(*whitelistFile)
+	file, err := os.Open(*allowlistFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -320,13 +320,13 @@ func loadWhitelists() {
 		}
 
 		maskOnes, _ := subnet.Mask.Size()
-		if !whitelistMasks[maskOnes] {
-			whitelistMasks[maskOnes] = true
+		if !allowlistMasks[maskOnes] {
+			allowlistMasks[maskOnes] = true
 		}
 		subnetStr := subnet.String()
-		if !whitelist[subnetStr] {
-			whitelist[subnetStr] = true
-			fmt.Fprintf(os.Stderr, "Subnet %s added to whitelist\n", subnetStr)
+		if !allowlist[subnetStr] {
+			allowlist[subnetStr] = true
+			fmt.Fprintf(os.Stderr, "Subnet %s added to allowlist\n", subnetStr)
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -340,13 +340,13 @@ func main() {
 	junkBelow = flag.Int("junkBelow", -1, "score below which session is junked")
 	slowFactor = flag.Int("slowFactor", -1, "delay factor to apply to sessions")
 	scoreHeader = flag.Bool("scoreHeader", false, "add X-SenderScore header")
-	whitelistFile = flag.String("whitelist", "", "file containing a list of IP addresses or subnets in CIDR notation to whitelist, one per line")
+	allowlistFile = flag.String("allowlist", "", "file containing a list of IP addresses or subnets in CIDR notation to allowlist, one per line")
 	testMode = flag.Bool("testMode", false, "skip all DNS queries, process all requests sequentially, only for debugging purposes")
 
 	flag.Parse()
 
 	validatePhase(*blockPhase)
-	loadWhitelists()
+	loadAllowlists()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	skipConfig(scanner)

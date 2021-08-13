@@ -12,7 +12,7 @@ The filter currently supports:
 - adding an `X-SenderScore` header with the score of the source IP address
 - adding an `X-Spam` header to hosts with reputation below a certain value
 - applying a time penalty proportional to the IP reputation
-- whitelisting IP addresses or subnets
+- allowlisting IP addresses or subnets
 
 
 ## Dependencies
@@ -59,4 +59,4 @@ listen on all filter "senderscore"
 
 `-scoreHeader` will add an X-SenderScore header with reputation value if known.
 
-`-whitelist <file>` can be used to specify a file containing a list of IP addresses and subnets in CIDR notation to whitelist, one per line. IP addresses matching any entry in that list automatically receive a score of 100.
+`-allowlist <file>` can be used to specify a file containing a list of IP addresses and subnets in CIDR notation to allowlist, one per line. IP addresses matching any entry in that list automatically receive a score of 100.
